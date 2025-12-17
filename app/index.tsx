@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, Dimensions } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert } from 'react-native';
 import { router } from 'expo-router';
 import * as SecureStore from 'expo-secure-store';
 import { colors } from '@/styles/commonStyles';
@@ -12,6 +12,7 @@ export default function PinSetupScreen() {
   const [confirmPin, setConfirmPin] = useState('');
   const [isSettingPin, setIsSettingPin] = useState(true);
   const [hasExistingPin, setHasExistingPin] = useState(false);
+  const [isConfirmingPin, setIsConfirmingPin] = useState(false);
 
   useEffect(() => {
     checkExistingPin();
@@ -20,6 +21,7 @@ export default function PinSetupScreen() {
   const checkExistingPin = async () => {
     try {
       const existingPin = await SecureStore.getItemAsync(PIN_KEY);
+      console.log('Checking existing PIN:', existingPin ? 'Found' : 'Not found');
       if (existingPin) {
         setHasExistingPin(true);
         setIsSettingPin(false);
@@ -31,35 +33,78 @@ export default function PinSetupScreen() {
 
   const handlePinInput = (value: string) => {
     if (value.length <= 4 && /^\d*$/.test(value)) {
-      if (isSettingPin) {
-        setPin(value);
-      } else {
+      if (hasExistingPin || isConfirmingPin) {
         setConfirmPin(value);
+      } else {
+        setPin(value);
       }
     }
   };
 
-  const handleSetPin = async () => {
-    if (pin.length !== 4) {
-      Alert.alert('Invalid PIN', 'Please enter a 4-digit PIN');
+  const handleContinue = async () => {
+    console.log('Continue button pressed');
+    console.log('hasExistingPin:', hasExistingPin);
+    console.log('isConfirmingPin:', isConfirmingPin);
+    console.log('pin length:', pin.length);
+    console.log('confirmPin length:', confirmPin.length);
+
+    // If user has existing PIN, verify it
+    if (hasExistingPin) {
+      if (confirmPin.length !== 4) {
+        Alert.alert('Invalid PIN', 'Please enter your 4-digit PIN');
+        return;
+      }
+
+      try {
+        const storedPin = await SecureStore.getItemAsync(PIN_KEY);
+        console.log('Verifying PIN...');
+        if (storedPin === confirmPin) {
+          console.log('PIN verified successfully, navigating to play screen');
+          router.replace('/play');
+        } else {
+          console.log('Incorrect PIN');
+          Alert.alert('Incorrect PIN', 'Please try again.');
+          setConfirmPin('');
+        }
+      } catch (error) {
+        console.log('Error verifying PIN:', error);
+        Alert.alert('Error', 'Failed to verify PIN. Please try again.');
+      }
       return;
     }
 
-    if (isSettingPin) {
-      setIsSettingPin(false);
+    // If user is setting a new PIN
+    if (!isConfirmingPin) {
+      // First step: entering the PIN
+      if (pin.length !== 4) {
+        Alert.alert('Invalid PIN', 'Please enter a 4-digit PIN');
+        return;
+      }
+      console.log('Moving to confirmation step');
+      setIsConfirmingPin(true);
+      return;
+    }
+
+    // Second step: confirming the PIN
+    if (confirmPin.length !== 4) {
+      Alert.alert('Invalid PIN', 'Please confirm your 4-digit PIN');
       return;
     }
 
     if (pin !== confirmPin) {
+      console.log('PINs do not match');
       Alert.alert('PIN Mismatch', 'PINs do not match. Please try again.');
       setPin('');
       setConfirmPin('');
-      setIsSettingPin(true);
+      setIsConfirmingPin(false);
       return;
     }
 
+    // Save the PIN and navigate to play screen
     try {
+      console.log('Saving PIN...');
       await SecureStore.setItemAsync(PIN_KEY, pin);
+      console.log('PIN saved successfully, navigating to play screen');
       router.replace('/play');
     } catch (error) {
       console.log('Error saving PIN:', error);
@@ -67,23 +112,11 @@ export default function PinSetupScreen() {
     }
   };
 
-  const handleVerifyPin = async () => {
-    if (confirmPin.length !== 4) {
-      Alert.alert('Invalid PIN', 'Please enter your 4-digit PIN');
-      return;
-    }
-
-    try {
-      const storedPin = await SecureStore.getItemAsync(PIN_KEY);
-      if (storedPin === confirmPin) {
-        router.replace('/play');
-      } else {
-        Alert.alert('Incorrect PIN', 'Please try again.');
-        setConfirmPin('');
-      }
-    } catch (error) {
-      console.log('Error verifying PIN:', error);
-      Alert.alert('Error', 'Failed to verify PIN. Please try again.');
+  const handleDelete = () => {
+    if (hasExistingPin || isConfirmingPin) {
+      setConfirmPin(confirmPin.slice(0, -1));
+    } else {
+      setPin(pin.slice(0, -1));
     }
   };
 
@@ -103,30 +136,50 @@ export default function PinSetupScreen() {
     );
   };
 
+  const getTitle = () => {
+    if (hasExistingPin) {
+      return 'Enter PIN to Continue';
+    }
+    if (isConfirmingPin) {
+      return 'Confirm Your PIN';
+    }
+    return 'Set Your 4-Digit PIN';
+  };
+
+  const getSubtitle = () => {
+    if (hasExistingPin) {
+      return 'Enter your PIN to access the play area';
+    }
+    if (isConfirmingPin) {
+      return 'Please enter your PIN again';
+    }
+    return 'This PIN will be required to exit the app';
+  };
+
+  const getButtonText = () => {
+    if (hasExistingPin) {
+      return 'Start Playing';
+    }
+    if (isConfirmingPin) {
+      return 'Start Playing';
+    }
+    return 'Next';
+  };
+
+  const currentValue = (hasExistingPin || isConfirmingPin) ? confirmPin : pin;
+
   return (
     <View style={styles.container}>
       <View style={styles.content}>
-        <Text style={styles.title}>
-          {hasExistingPin
-            ? 'Enter PIN to Continue'
-            : isSettingPin
-            ? 'Set Your 4-Digit PIN'
-            : 'Confirm Your PIN'}
-        </Text>
+        <Text style={styles.title}>{getTitle()}</Text>
         
-        <Text style={styles.subtitle}>
-          {hasExistingPin
-            ? 'Enter your PIN to access the play area'
-            : isSettingPin
-            ? 'This PIN will be required to exit the app'
-            : 'Please enter your PIN again'}
-        </Text>
+        <Text style={styles.subtitle}>{getSubtitle()}</Text>
 
-        {renderPinDots(hasExistingPin ? confirmPin : isSettingPin ? pin : confirmPin)}
+        {renderPinDots(currentValue)}
 
         <TextInput
           style={styles.hiddenInput}
-          value={hasExistingPin ? confirmPin : isSettingPin ? pin : confirmPin}
+          value={currentValue}
           onChangeText={handlePinInput}
           keyboardType="number-pad"
           maxLength={4}
@@ -140,7 +193,6 @@ export default function PinSetupScreen() {
               key={num}
               style={styles.numpadButton}
               onPress={() => {
-                const currentValue = hasExistingPin ? confirmPin : isSettingPin ? pin : confirmPin;
                 if (currentValue.length < 4) {
                   handlePinInput(currentValue + num.toString());
                 }
@@ -154,21 +206,16 @@ export default function PinSetupScreen() {
         <View style={styles.buttonContainer}>
           <TouchableOpacity
             style={[styles.button, styles.deleteButton]}
-            onPress={() => {
-              const currentValue = hasExistingPin ? confirmPin : isSettingPin ? pin : confirmPin;
-              handlePinInput(currentValue.slice(0, -1));
-            }}
+            onPress={handleDelete}
           >
             <Text style={styles.buttonText}>Delete</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
             style={[styles.button, styles.continueButton]}
-            onPress={hasExistingPin ? handleVerifyPin : handleSetPin}
+            onPress={handleContinue}
           >
-            <Text style={styles.buttonText}>
-              {hasExistingPin ? 'Enter' : isSettingPin ? 'Next' : 'Start Playing'}
-            </Text>
+            <Text style={styles.buttonText}>{getButtonText()}</Text>
           </TouchableOpacity>
         </View>
 
