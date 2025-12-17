@@ -39,6 +39,7 @@ export default function PinSetupScreen() {
   const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
+    console.log('📱 PIN Setup Screen mounted');
     checkExistingPin();
   }, []);
 
@@ -67,10 +68,11 @@ export default function PinSetupScreen() {
 
   const navigateToPlay = () => {
     console.log('🚀 Attempting navigation to /play');
+    console.log('Current route:', router);
     try {
-      // Try multiple navigation methods
+      // Use push instead of replace to ensure navigation happens
       router.push('/play');
-      console.log('✅ Navigation command sent');
+      console.log('✅ Navigation command sent successfully');
     } catch (error) {
       console.error('❌ Navigation error:', error);
       Alert.alert('Navigation Error', 'Failed to navigate. Please restart the app.');
@@ -106,10 +108,12 @@ export default function PinSetupScreen() {
           console.log('✅ PIN verified successfully!');
           console.log('Navigating to /play...');
           
-          // Navigate immediately
-          navigateToPlay();
+          // Small delay to ensure state is updated
+          setTimeout(() => {
+            navigateToPlay();
+          }, 100);
           
-          // Reset loading after a delay
+          // Reset loading after navigation
           setTimeout(() => {
             setIsLoading(false);
           }, 1000);
@@ -159,10 +163,12 @@ export default function PinSetupScreen() {
       console.log('✅ PIN saved successfully!');
       console.log('Navigating to /play...');
       
-      // Navigate immediately
-      navigateToPlay();
+      // Small delay to ensure state is updated
+      setTimeout(() => {
+        navigateToPlay();
+      }, 100);
       
-      // Reset loading after a delay
+      // Reset loading after navigation
       setTimeout(() => {
         setIsLoading(false);
       }, 1000);

@@ -76,14 +76,29 @@ export default function PlayScreen() {
   const [tapCount, setTapCount] = useState(0);
   const [animatedElements, setAnimatedElements] = useState<AnimatedElement[]>([]);
   const [accelerometerAvailable, setAccelerometerAvailable] = useState(false);
+  const [showWelcome, setShowWelcome] = useState(true);
   
   const tapTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const lastTapRef = useRef(0);
   const accelerometerSubscription = useRef<any>(null);
+  const welcomeOpacity = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
     console.log('🎮 Play screen mounted successfully!');
+    console.log('Screen dimensions:', SCREEN_WIDTH, 'x', SCREEN_HEIGHT);
     setupAccelerometer();
+    
+    // Hide welcome message after 3 seconds
+    setTimeout(() => {
+      Animated.timing(welcomeOpacity, {
+        toValue: 0,
+        duration: 500,
+        useNativeDriver: true,
+      }).start(() => {
+        setShowWelcome(false);
+      });
+    }, 3000);
+    
     return () => {
       if (accelerometerSubscription.current) {
         console.log('Cleaning up accelerometer subscription');
@@ -152,6 +167,7 @@ export default function PlayScreen() {
   };
 
   const handleTouchStart = (event: any) => {
+    console.log('Touch start detected');
     const { locationX, locationY } = event.nativeEvent;
     const newColor = getRandomColor();
     setCurrentColor(newColor);
@@ -160,6 +176,9 @@ export default function PlayScreen() {
     if (Platform.OS === 'ios') {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     }
+    
+    // Also spawn an animated element on touch
+    spawnAnimatedElement(locationX, locationY);
   };
 
   const handleTouchMove = (event: any) => {
@@ -168,35 +187,15 @@ export default function PlayScreen() {
   };
 
   const handleTouchEnd = () => {
+    console.log('Touch end - saving path');
     if (currentPath) {
       setPaths((prev) => [...prev, { path: currentPath, color: currentColor }]);
       setCurrentPath('');
     }
   };
 
-  const handleScreenTap = (event: any) => {
-    const { locationX, locationY } = event.nativeEvent;
-    
-    const now = Date.now();
-    if (now - lastTapRef.current < 300) {
-      setTapCount((prev) => prev + 1);
-    } else {
-      setTapCount(1);
-    }
-    lastTapRef.current = now;
-
-    if (tapTimeoutRef.current) {
-      clearTimeout(tapTimeoutRef.current);
-    }
-
-    tapTimeoutRef.current = setTimeout(() => {
-      setTapCount(0);
-    }, 500);
-
-    spawnAnimatedElement(locationX, locationY);
-  };
-
   const spawnAnimatedElement = (x: number, y: number) => {
+    console.log('Spawning animated element at', x, y);
     const types: ('ball' | 'bubble' | 'star')[] = ['ball', 'bubble', 'star'];
     const type = types[Math.floor(Math.random() * types.length)];
     const animation = new Animated.Value(0);
@@ -232,6 +231,7 @@ export default function PlayScreen() {
   };
 
   const handleTopRightTap = () => {
+    console.log('Top right corner tapped');
     const now = Date.now();
     if (now - lastTapRef.current < 500) {
       setTapCount((prev) => prev + 1);
@@ -307,12 +307,14 @@ export default function PlayScreen() {
 
   return (
     <View style={styles.container}>
+      {/* Hidden exit button in top-right corner */}
       <TouchableOpacity
         style={styles.hiddenExitButton}
         onPress={handleTopRightTap}
         activeOpacity={1}
       />
 
+      {/* Drawing canvas */}
       <View
         style={styles.canvas}
         onTouchStart={handleTouchStart}
@@ -348,6 +350,15 @@ export default function PlayScreen() {
         {animatedElements.map(renderAnimatedElement)}
       </View>
 
+      {/* Welcome message */}
+      {showWelcome && (
+        <Animated.View style={[styles.welcomeContainer, { opacity: welcomeOpacity }]}>
+          <Text style={styles.welcomeText}>🎨 Touch anywhere to draw! 🎨</Text>
+          <Text style={styles.welcomeSubtext}>Shake to clear • Triple-tap top-right to exit</Text>
+        </Animated.View>
+      )}
+
+      {/* PIN exit modal */}
       <Modal
         visible={showPinModal}
         transparent
@@ -412,12 +423,13 @@ export default function PlayScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: '#FFFFFF',
   },
   canvas: {
     flex: 1,
     width: SCREEN_WIDTH,
     height: SCREEN_HEIGHT,
+    backgroundColor: '#FFFFFF',
   },
   hiddenExitButton: {
     position: 'absolute',
@@ -426,6 +438,35 @@ const styles = StyleSheet.create({
     width: 100,
     height: 100,
     zIndex: 1000,
+    backgroundColor: 'transparent',
+  },
+  welcomeContainer: {
+    position: 'absolute',
+    top: '40%',
+    left: 0,
+    right: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 20,
+    pointerEvents: 'none',
+  },
+  welcomeText: {
+    fontSize: 32,
+    fontWeight: 'bold',
+    color: colors.primary,
+    textAlign: 'center',
+    marginBottom: 10,
+    textShadowColor: 'rgba(0, 0, 0, 0.2)',
+    textShadowOffset: { width: 2, height: 2 },
+    textShadowRadius: 4,
+  },
+  welcomeSubtext: {
+    fontSize: 16,
+    color: colors.text,
+    textAlign: 'center',
+    textShadowColor: 'rgba(255, 255, 255, 0.8)',
+    textShadowOffset: { width: 1, height: 1 },
+    textShadowRadius: 2,
   },
   animatedElement: {
     position: 'absolute',
@@ -433,6 +474,7 @@ const styles = StyleSheet.create({
     height: 60,
     justifyContent: 'center',
     alignItems: 'center',
+    pointerEvents: 'none',
   },
   ball: {
     width: 60,
@@ -495,6 +537,7 @@ const styles = StyleSheet.create({
     width: '100%',
     marginBottom: 20,
     color: colors.text,
+    backgroundColor: colors.background,
   },
   modalButtons: {
     flexDirection: 'row',
