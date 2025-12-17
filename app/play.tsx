@@ -17,6 +17,7 @@ import * as SecureStore from 'expo-secure-store';
 import { Accelerometer } from 'expo-sensors';
 import * as Haptics from 'expo-haptics';
 import Svg, { Path } from 'react-native-svg';
+import { GestureDetector, Gesture } from 'react-native-gesture-handler';
 import { colors } from '@/styles/commonStyles';
 
 const PIN_KEY = 'baby_play_pad_pin';
@@ -166,34 +167,6 @@ export default function PlayScreen() {
     return BRIGHT_COLORS[Math.floor(Math.random() * BRIGHT_COLORS.length)];
   };
 
-  const handleTouchStart = (event: any) => {
-    console.log('Touch start detected');
-    const { locationX, locationY } = event.nativeEvent;
-    const newColor = getRandomColor();
-    setCurrentColor(newColor);
-    setCurrentPath(`M ${locationX} ${locationY}`);
-    
-    if (Platform.OS === 'ios') {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    }
-    
-    // Also spawn an animated element on touch
-    spawnAnimatedElement(locationX, locationY);
-  };
-
-  const handleTouchMove = (event: any) => {
-    const { locationX, locationY } = event.nativeEvent;
-    setCurrentPath((prev) => `${prev} L ${locationX} ${locationY}`);
-  };
-
-  const handleTouchEnd = () => {
-    console.log('Touch end - saving path');
-    if (currentPath) {
-      setPaths((prev) => [...prev, { path: currentPath, color: currentColor }]);
-      setCurrentPath('');
-    }
-  };
-
   const spawnAnimatedElement = (x: number, y: number) => {
     console.log('Spawning animated element at', x, y);
     const types: ('ball' | 'bubble' | 'star')[] = ['ball', 'bubble', 'star'];
@@ -305,6 +278,32 @@ export default function PlayScreen() {
     );
   };
 
+  // Create pan gesture for drawing
+  const panGesture = Gesture.Pan()
+    .onBegin((event) => {
+      console.log('Drawing started at:', event.x, event.y);
+      const newColor = getRandomColor();
+      setCurrentColor(newColor);
+      setCurrentPath(`M ${event.x} ${event.y}`);
+      
+      if (Platform.OS === 'ios') {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      }
+      
+      // Spawn an animated element on touch
+      spawnAnimatedElement(event.x, event.y);
+    })
+    .onUpdate((event) => {
+      setCurrentPath((prev) => `${prev} L ${event.x} ${event.y}`);
+    })
+    .onEnd(() => {
+      console.log('Drawing ended - saving path');
+      if (currentPath) {
+        setPaths((prev) => [...prev, { path: currentPath, color: currentColor }]);
+        setCurrentPath('');
+      }
+    });
+
   return (
     <View style={styles.container}>
       {/* Hidden exit button in top-right corner */}
@@ -315,40 +314,35 @@ export default function PlayScreen() {
       />
 
       {/* Drawing canvas */}
-      <View
-        style={styles.canvas}
-        onTouchStart={handleTouchStart}
-        onTouchMove={handleTouchMove}
-        onTouchEnd={handleTouchEnd}
-        onStartShouldSetResponder={() => true}
-        onMoveShouldSetResponder={() => true}
-      >
-        <Svg width={SCREEN_WIDTH} height={SCREEN_HEIGHT}>
-          {paths.map((pathData, index) => (
-            <Path
-              key={index}
-              d={pathData.path}
-              stroke={pathData.color}
-              strokeWidth={8}
-              fill="none"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          ))}
-          {currentPath && (
-            <Path
-              d={currentPath}
-              stroke={currentColor}
-              strokeWidth={8}
-              fill="none"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          )}
-        </Svg>
+      <GestureDetector gesture={panGesture}>
+        <View style={styles.canvas}>
+          <Svg width={SCREEN_WIDTH} height={SCREEN_HEIGHT}>
+            {paths.map((pathData, index) => (
+              <Path
+                key={index}
+                d={pathData.path}
+                stroke={pathData.color}
+                strokeWidth={8}
+                fill="none"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            ))}
+            {currentPath && (
+              <Path
+                d={currentPath}
+                stroke={currentColor}
+                strokeWidth={8}
+                fill="none"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            )}
+          </Svg>
 
-        {animatedElements.map(renderAnimatedElement)}
-      </View>
+          {animatedElements.map(renderAnimatedElement)}
+        </View>
+      </GestureDetector>
 
       {/* Welcome message */}
       {showWelcome && (
