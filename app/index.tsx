@@ -42,6 +42,18 @@ export default function PinSetupScreen() {
     }
   };
 
+  const navigateToPlay = () => {
+    console.log('🚀 Attempting navigation to /play');
+    try {
+      // Try multiple navigation methods
+      router.push('/play');
+      console.log('✅ Navigation command sent');
+    } catch (error) {
+      console.error('❌ Navigation error:', error);
+      Alert.alert('Navigation Error', 'Failed to navigate. Please restart the app.');
+    }
+  };
+
   const handleContinue = async () => {
     if (isLoading) {
       console.log('Already processing, please wait...');
@@ -71,10 +83,13 @@ export default function PinSetupScreen() {
           console.log('✅ PIN verified successfully!');
           console.log('Navigating to /play...');
           
-          // Use a small delay to ensure state updates complete
+          // Navigate immediately
+          navigateToPlay();
+          
+          // Reset loading after a delay
           setTimeout(() => {
-            router.replace('/play');
-          }, 100);
+            setIsLoading(false);
+          }, 1000);
         } else {
           console.log('❌ Incorrect PIN');
           Alert.alert('Incorrect PIN', 'Please try again.');
@@ -121,10 +136,13 @@ export default function PinSetupScreen() {
       console.log('✅ PIN saved successfully!');
       console.log('Navigating to /play...');
       
-      // Use a small delay to ensure state updates complete
+      // Navigate immediately
+      navigateToPlay();
+      
+      // Reset loading after a delay
       setTimeout(() => {
-        router.replace('/play');
-      }, 100);
+        setIsLoading(false);
+      }, 1000);
     } catch (error) {
       console.log('❌ Error in handleContinue:', error);
       Alert.alert('Error', 'Something went wrong. Please try again.');

@@ -62,6 +62,7 @@ export default function PlayScreen() {
   const accelerometerSubscription = useRef<any>(null);
 
   useEffect(() => {
+    console.log('🎮 Play screen mounted successfully!');
     setupAccelerometer();
     return () => {
       if (accelerometerSubscription.current) {
@@ -181,6 +182,7 @@ export default function PlayScreen() {
       setTapCount((prev) => prev + 1);
       
       if (tapCount >= 2) {
+        console.log('Triple tap detected - showing PIN modal');
         setShowPinModal(true);
         setTapCount(0);
       }
@@ -199,6 +201,7 @@ export default function PlayScreen() {
     try {
       const storedPin = await SecureStore.getItemAsync(PIN_KEY);
       if (storedPin === pinInput) {
+        console.log('PIN verified - navigating back to index');
         router.replace('/');
       } else {
         Alert.alert('Incorrect PIN', 'Please try again.');
