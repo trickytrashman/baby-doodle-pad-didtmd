@@ -22,6 +22,25 @@ import { colors } from '@/styles/commonStyles';
 const PIN_KEY = 'baby_play_pad_pin';
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
+// Storage wrapper to handle web vs native
+const storage = {
+  async setItem(key: string, value: string): Promise<void> {
+    if (Platform.OS === 'web') {
+      localStorage.setItem(key, value);
+    } else {
+      await SecureStore.setItemAsync(key, value);
+    }
+  },
+  
+  async getItem(key: string): Promise<string | null> {
+    if (Platform.OS === 'web') {
+      return localStorage.getItem(key);
+    } else {
+      return await SecureStore.getItemAsync(key);
+    }
+  }
+};
+
 interface PathData {
   path: string;
   color: string;
@@ -56,6 +75,7 @@ export default function PlayScreen() {
   const [pinInput, setPinInput] = useState('');
   const [tapCount, setTapCount] = useState(0);
   const [animatedElements, setAnimatedElements] = useState<AnimatedElement[]>([]);
+  const [accelerometerAvailable, setAccelerometerAvailable] = useState(false);
   
   const tapTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const lastTapRef = useRef(0);
@@ -66,21 +86,56 @@ export default function PlayScreen() {
     setupAccelerometer();
     return () => {
       if (accelerometerSubscription.current) {
+        console.log('Cleaning up accelerometer subscription');
         accelerometerSubscription.current.remove();
       }
     };
   }, []);
 
-  const setupAccelerometer = () => {
-    Accelerometer.setUpdateInterval(100);
-    accelerometerSubscription.current = Accelerometer.addListener((data) => {
-      const { x, y, z } = data;
-      const acceleration = Math.sqrt(x * x + y * y + z * z);
+  const setupAccelerometer = async () => {
+    try {
+      console.log('Setting up accelerometer...');
       
-      if (acceleration > 2.5) {
-        handleShake();
+      // Check if accelerometer is available
+      const isAvailable = await Accelerometer.isAvailableAsync();
+      console.log('Accelerometer available:', isAvailable);
+      
+      if (!isAvailable) {
+        console.log('Accelerometer not available on this device/platform');
+        setAccelerometerAvailable(false);
+        return;
       }
-    });
+
+      // On web, request permissions
+      if (Platform.OS === 'web') {
+        console.log('Requesting accelerometer permissions for web...');
+        const { status } = await Accelerometer.requestPermissionsAsync();
+        console.log('Permission status:', status);
+        
+        if (status !== 'granted') {
+          console.log('Accelerometer permission not granted');
+          setAccelerometerAvailable(false);
+          return;
+        }
+      }
+
+      // Set up the accelerometer listener
+      Accelerometer.setUpdateInterval(100);
+      accelerometerSubscription.current = Accelerometer.addListener((data) => {
+        const { x, y, z } = data;
+        const acceleration = Math.sqrt(x * x + y * y + z * z);
+        
+        if (acceleration > 2.5) {
+          handleShake();
+        }
+      });
+      
+      setAccelerometerAvailable(true);
+      console.log('✅ Accelerometer set up successfully!');
+    } catch (error) {
+      console.log('❌ Error setting up accelerometer:', error);
+      setAccelerometerAvailable(false);
+    }
   };
 
   const handleShake = () => {
@@ -199,7 +254,7 @@ export default function PlayScreen() {
     }
 
     try {
-      const storedPin = await SecureStore.getItemAsync(PIN_KEY);
+      const storedPin = await storage.getItem(PIN_KEY);
       if (storedPin === pinInput) {
         console.log('PIN verified - navigating back to index');
         router.replace('/');
