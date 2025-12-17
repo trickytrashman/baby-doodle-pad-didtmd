@@ -1,8 +1,7 @@
-
 {
   "expo": {
-    "name": "Baby Play Pad",
-    "slug": "baby-play-pad",
+    "name": "Baby Doodle Pad",
+    "slug": "Baby Doodle Pad",
     "version": "1.0.0",
     "orientation": "default",
     "icon": "./assets/images/natively-dark.png",
@@ -55,5 +54,6 @@
     "extra": {
       "router": {}
     }
-  }
+  },
+  "scheme": "Baby Doodle Pad"
 }

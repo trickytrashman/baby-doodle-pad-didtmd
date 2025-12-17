@@ -17,8 +17,7 @@ import * as SecureStore from 'expo-secure-store';
 import { Accelerometer } from 'expo-sensors';
 import * as Haptics from 'expo-haptics';
 import Svg, { Path } from 'react-native-svg';
-import { GestureDetector, Gesture } from 'react-native-gesture-handler';
-import { useAudioPlayer } from 'expo-audio';
+import { GestureDetector, Gesture, GestureHandlerRootView } from 'react-native-gesture-handler';
 import { colors } from '@/styles/commonStyles';
 
 const PIN_KEY = 'baby_play_pad_pin';
@@ -84,27 +83,6 @@ export default function PlayScreen() {
   const lastTapRef = useRef(0);
   const accelerometerSubscription = useRef<any>(null);
   const welcomeOpacity = useRef(new Animated.Value(1)).current;
-
-  // Audio players for different sound effects
-  // Note: You'll need to add actual sound files to assets/sounds/
-  // For now, these will be silent until you add the files
-  const touchSound = useAudioPlayer(
-    // Uncomment and use when you have sound files:
-    // require('@/assets/sounds/touch.mp3')
-    null
-  );
-  
-  const popSound = useAudioPlayer(
-    // Uncomment and use when you have sound files:
-    // require('@/assets/sounds/pop.mp3')
-    null
-  );
-  
-  const clearSound = useAudioPlayer(
-    // Uncomment and use when you have sound files:
-    // require('@/assets/sounds/clear.mp3')
-    null
-  );
 
   useEffect(() => {
     console.log('🎮 Play screen mounted successfully!');
@@ -176,25 +154,10 @@ export default function PlayScreen() {
     }
   };
 
-  const playSound = async (player: any) => {
-    try {
-      if (player && player.playing === false) {
-        // Reset to beginning and play
-        await player.seekTo(0);
-        await player.play();
-      }
-    } catch (error) {
-      console.log('Error playing sound:', error);
-    }
-  };
-
   const handleShake = () => {
     console.log('Shake detected - clearing canvas');
     setPaths([]);
     setAnimatedElements([]);
-    
-    // Play clear sound
-    playSound(clearSound);
     
     if (Platform.OS === 'ios') {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -220,9 +183,6 @@ export default function PlayScreen() {
     };
 
     setAnimatedElements((prev) => [...prev, element]);
-
-    // Play pop sound when element spawns
-    playSound(popSound);
 
     Animated.sequence([
       Animated.timing(animation, {
@@ -327,9 +287,6 @@ export default function PlayScreen() {
       setCurrentColor(newColor);
       setCurrentPath(`M ${event.x} ${event.y}`);
       
-      // Play touch sound
-      playSound(touchSound);
-      
       if (Platform.OS === 'ios') {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
       }
@@ -360,7 +317,7 @@ export default function PlayScreen() {
       {/* Drawing canvas */}
       <GestureDetector gesture={panGesture}>
         <View style={styles.canvas}>
-          <Svg width={SCREEN_WIDTH} height={SCREEN_HEIGHT}>
+          <Svg width={SCREEN_WIDTH} height={SCREEN_HEIGHT} style={styles.svg}>
             {paths.map((pathData, index) => (
               <Path
                 key={index}
@@ -392,7 +349,9 @@ export default function PlayScreen() {
       {showWelcome && (
         <Animated.View style={[styles.welcomeContainer, { opacity: welcomeOpacity }]}>
           <Text style={styles.welcomeText}>🎨 Touch anywhere to draw! 🎨</Text>
-          <Text style={styles.welcomeSubtext}>Shake to clear • Triple-tap top-right to exit</Text>
+          <Text style={styles.welcomeSubtext}>
+            {accelerometerAvailable ? 'Shake to clear • ' : ''}Triple-tap top-right to exit
+          </Text>
         </Animated.View>
       )}
 
@@ -468,6 +427,11 @@ const styles = StyleSheet.create({
     width: SCREEN_WIDTH,
     height: SCREEN_HEIGHT,
     backgroundColor: '#FFFFFF',
+  },
+  svg: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
   },
   hiddenExitButton: {
     position: 'absolute',
@@ -601,103 +565,3 @@ const styles = StyleSheet.create({
     color: colors.card,
   },
 });
-</write file>
-
-Now let me update the README in the sounds folder to provide instructions on adding sound files:
-
-<write file="assets/sounds/README.md">
-# Sound Files for Baby Play Pad
-
-This folder should contain sound effect files for the app. The app is configured to play sounds on various interactions.
-
-## Required Sound Files
-
-To enable sound effects, add the following audio files to this folder:
-
-### 1. touch.mp3 (or touch.wav)
-- **Purpose**: Plays when the user touches the screen to start drawing
-- **Recommended**: A short, pleasant chime or bell sound (100-300ms)
-- **Suggestions**: 
-  - Soft xylophone note
-  - Gentle bell chime
-  - Playful "boing" sound
-
-### 2. pop.mp3 (or pop.wav)
-- **Purpose**: Plays when animated elements (balls, bubbles, stars) appear
-- **Recommended**: A fun pop or giggle sound (200-500ms)
-- **Suggestions**:
-  - Bubble pop sound
-  - Baby giggle
-  - Cartoon "pop" effect
-  - Playful "boop" sound
-
-### 3. clear.mp3 (or clear.wav)
-- **Purpose**: Plays when the canvas is cleared (shake gesture)
-- **Recommended**: A whoosh or sweep sound (300-800ms)
-- **Suggestions**:
-  - Whoosh sound
-  - Sweep effect
-  - Magical sparkle sound
-  - Gentle "swoosh"
-
-## How to Add Sound Files
-
-1. Find or create appropriate sound effects (royalty-free sources below)
-2. Convert them to MP3 or WAV format
-3. Name them exactly as listed above (touch.mp3, pop.mp3, clear.mp3)
-4. Place them in this `assets/sounds/` folder
-5. Update the code in `app/play.tsx` to uncomment the sound file imports:
-
-```typescript
-// Change from:
-const touchSound = useAudioPlayer(null);
-
-// To:
-const touchSound = useAudioPlayer(require('@/assets/sounds/touch.mp3'));
-```
-
-Do this for all three sound players (touchSound, popSound, clearSound).
-
-## Free Sound Resources
-
-Here are some websites where you can find royalty-free sound effects:
-
-- **Freesound.org** - https://freesound.org/
-- **Zapsplat** - https://www.zapsplat.com/
-- **Mixkit** - https://mixkit.co/free-sound-effects/
-- **BBC Sound Effects** - https://sound-effects.bbcrewind.co.uk/
-- **Pixabay** - https://pixabay.com/sound-effects/
-
-## Audio Format Recommendations
-
-- **Format**: MP3 (best compatibility) or WAV (higher quality)
-- **Sample Rate**: 44.1 kHz
-- **Bit Rate**: 128-192 kbps for MP3
-- **Duration**: Keep sounds short (under 1 second) for better performance
-- **Volume**: Normalize all sounds to similar volume levels
-
-## Testing
-
-After adding sound files:
-
-1. Restart the Expo development server
-2. Test each interaction:
-   - Touch the screen to draw (should play touch.mp3)
-   - Watch for animated elements (should play pop.mp3)
-   - Shake the device (should play clear.mp3)
-
-## Troubleshooting
-
-If sounds don't play:
-
-1. Check that file names match exactly (case-sensitive)
-2. Verify files are in the correct format (MP3 or WAV)
-3. Check the console for any audio loading errors
-4. Make sure you uncommented the require() statements in play.tsx
-5. Try restarting the Expo development server
-
-## Current Status
-
-⚠️ **No sound files are currently present in this folder.**
-
-The app will work without sound files, but the audio features will be silent until you add them.
