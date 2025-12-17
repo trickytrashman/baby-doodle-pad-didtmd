@@ -1,11 +1,34 @@
 
 import React, { useState, useEffect } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, Platform } from 'react-native';
 import { router } from 'expo-router';
 import * as SecureStore from 'expo-secure-store';
 import { colors } from '@/styles/commonStyles';
 
 const PIN_KEY = 'baby_play_pad_pin';
+
+// Storage wrapper to handle web vs native
+const storage = {
+  async setItem(key: string, value: string): Promise<void> {
+    if (Platform.OS === 'web') {
+      // Use localStorage for web
+      localStorage.setItem(key, value);
+    } else {
+      // Use SecureStore for native
+      await SecureStore.setItemAsync(key, value);
+    }
+  },
+  
+  async getItem(key: string): Promise<string | null> {
+    if (Platform.OS === 'web') {
+      // Use localStorage for web
+      return localStorage.getItem(key);
+    } else {
+      // Use SecureStore for native
+      return await SecureStore.getItemAsync(key);
+    }
+  }
+};
 
 export default function PinSetupScreen() {
   const [pin, setPin] = useState('');
@@ -21,7 +44,7 @@ export default function PinSetupScreen() {
 
   const checkExistingPin = async () => {
     try {
-      const existingPin = await SecureStore.getItemAsync(PIN_KEY);
+      const existingPin = await storage.getItem(PIN_KEY);
       console.log('Checking existing PIN:', existingPin ? 'Found' : 'Not found');
       if (existingPin) {
         setHasExistingPin(true);
@@ -76,7 +99,7 @@ export default function PinSetupScreen() {
           return;
         }
 
-        const storedPin = await SecureStore.getItemAsync(PIN_KEY);
+        const storedPin = await storage.getItem(PIN_KEY);
         console.log('Stored PIN retrieved for verification');
         
         if (storedPin === confirmPin) {
@@ -132,7 +155,7 @@ export default function PinSetupScreen() {
 
       // Save the PIN and navigate to play screen
       console.log('Saving new PIN...');
-      await SecureStore.setItemAsync(PIN_KEY, pin);
+      await storage.setItem(PIN_KEY, pin);
       console.log('✅ PIN saved successfully!');
       console.log('Navigating to /play...');
       
@@ -143,9 +166,10 @@ export default function PinSetupScreen() {
       setTimeout(() => {
         setIsLoading(false);
       }, 1000);
-    } catch (error) {
+    } catch (error: any) {
       console.log('❌ Error in handleContinue:', error);
-      Alert.alert('Error', 'Something went wrong. Please try again.');
+      console.log('Error details:', error.message, error.stack);
+      Alert.alert('Error', `Something went wrong: ${error.message || 'Unknown error'}`);
       setIsLoading(false);
     }
   };
