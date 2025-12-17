@@ -13,6 +13,7 @@ export default function PinSetupScreen() {
   const [isSettingPin, setIsSettingPin] = useState(true);
   const [hasExistingPin, setHasExistingPin] = useState(false);
   const [isConfirmingPin, setIsConfirmingPin] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
     checkExistingPin();
@@ -42,73 +43,92 @@ export default function PinSetupScreen() {
   };
 
   const handleContinue = async () => {
-    console.log('Continue button pressed');
+    if (isLoading) {
+      console.log('Already processing, please wait...');
+      return;
+    }
+
+    setIsLoading(true);
+    console.log('=== Continue button pressed ===');
     console.log('hasExistingPin:', hasExistingPin);
     console.log('isConfirmingPin:', isConfirmingPin);
-    console.log('pin length:', pin.length);
-    console.log('confirmPin length:', confirmPin.length);
+    console.log('pin:', pin);
+    console.log('confirmPin:', confirmPin);
 
-    // If user has existing PIN, verify it
-    if (hasExistingPin) {
-      if (confirmPin.length !== 4) {
-        Alert.alert('Invalid PIN', 'Please enter your 4-digit PIN');
-        return;
-      }
+    try {
+      // If user has existing PIN, verify it
+      if (hasExistingPin) {
+        if (confirmPin.length !== 4) {
+          Alert.alert('Invalid PIN', 'Please enter your 4-digit PIN');
+          setIsLoading(false);
+          return;
+        }
 
-      try {
         const storedPin = await SecureStore.getItemAsync(PIN_KEY);
-        console.log('Verifying PIN...');
+        console.log('Stored PIN retrieved for verification');
+        
         if (storedPin === confirmPin) {
-          console.log('PIN verified successfully, navigating to play screen');
-          router.replace('/play');
+          console.log('✅ PIN verified successfully!');
+          console.log('Navigating to /play...');
+          
+          // Use a small delay to ensure state updates complete
+          setTimeout(() => {
+            router.replace('/play');
+          }, 100);
         } else {
-          console.log('Incorrect PIN');
+          console.log('❌ Incorrect PIN');
           Alert.alert('Incorrect PIN', 'Please try again.');
           setConfirmPin('');
+          setIsLoading(false);
         }
-      } catch (error) {
-        console.log('Error verifying PIN:', error);
-        Alert.alert('Error', 'Failed to verify PIN. Please try again.');
-      }
-      return;
-    }
-
-    // If user is setting a new PIN
-    if (!isConfirmingPin) {
-      // First step: entering the PIN
-      if (pin.length !== 4) {
-        Alert.alert('Invalid PIN', 'Please enter a 4-digit PIN');
         return;
       }
-      console.log('Moving to confirmation step');
-      setIsConfirmingPin(true);
-      return;
-    }
 
-    // Second step: confirming the PIN
-    if (confirmPin.length !== 4) {
-      Alert.alert('Invalid PIN', 'Please confirm your 4-digit PIN');
-      return;
-    }
+      // If user is setting a new PIN
+      if (!isConfirmingPin) {
+        // First step: entering the PIN
+        if (pin.length !== 4) {
+          Alert.alert('Invalid PIN', 'Please enter a 4-digit PIN');
+          setIsLoading(false);
+          return;
+        }
+        console.log('Moving to confirmation step');
+        setIsConfirmingPin(true);
+        setIsLoading(false);
+        return;
+      }
 
-    if (pin !== confirmPin) {
-      console.log('PINs do not match');
-      Alert.alert('PIN Mismatch', 'PINs do not match. Please try again.');
-      setPin('');
-      setConfirmPin('');
-      setIsConfirmingPin(false);
-      return;
-    }
+      // Second step: confirming the PIN
+      if (confirmPin.length !== 4) {
+        Alert.alert('Invalid PIN', 'Please confirm your 4-digit PIN');
+        setIsLoading(false);
+        return;
+      }
 
-    // Save the PIN and navigate to play screen
-    try {
-      console.log('Saving PIN...');
+      if (pin !== confirmPin) {
+        console.log('❌ PINs do not match');
+        Alert.alert('PIN Mismatch', 'PINs do not match. Please try again.');
+        setPin('');
+        setConfirmPin('');
+        setIsConfirmingPin(false);
+        setIsLoading(false);
+        return;
+      }
+
+      // Save the PIN and navigate to play screen
+      console.log('Saving new PIN...');
       await SecureStore.setItemAsync(PIN_KEY, pin);
-      console.log('PIN saved successfully, navigating to play screen');
-      router.replace('/play');
+      console.log('✅ PIN saved successfully!');
+      console.log('Navigating to /play...');
+      
+      // Use a small delay to ensure state updates complete
+      setTimeout(() => {
+        router.replace('/play');
+      }, 100);
     } catch (error) {
-      console.log('Error saving PIN:', error);
-      Alert.alert('Error', 'Failed to save PIN. Please try again.');
+      console.log('❌ Error in handleContinue:', error);
+      Alert.alert('Error', 'Something went wrong. Please try again.');
+      setIsLoading(false);
     }
   };
 
@@ -157,6 +177,9 @@ export default function PinSetupScreen() {
   };
 
   const getButtonText = () => {
+    if (isLoading) {
+      return 'Loading...';
+    }
     if (hasExistingPin) {
       return 'Start Playing';
     }
@@ -167,6 +190,7 @@ export default function PinSetupScreen() {
   };
 
   const currentValue = (hasExistingPin || isConfirmingPin) ? confirmPin : pin;
+  const isButtonDisabled = isLoading || currentValue.length !== 4;
 
   return (
     <View style={styles.container}>
@@ -185,6 +209,7 @@ export default function PinSetupScreen() {
           maxLength={4}
           secureTextEntry
           autoFocus
+          editable={!isLoading}
         />
 
         <View style={styles.numpadContainer}>
@@ -193,10 +218,11 @@ export default function PinSetupScreen() {
               key={num}
               style={styles.numpadButton}
               onPress={() => {
-                if (currentValue.length < 4) {
+                if (currentValue.length < 4 && !isLoading) {
                   handlePinInput(currentValue + num.toString());
                 }
               }}
+              disabled={isLoading}
             >
               <Text style={styles.numpadText}>{num}</Text>
             </TouchableOpacity>
@@ -207,13 +233,19 @@ export default function PinSetupScreen() {
           <TouchableOpacity
             style={[styles.button, styles.deleteButton]}
             onPress={handleDelete}
+            disabled={isLoading}
           >
             <Text style={styles.buttonText}>Delete</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
-            style={[styles.button, styles.continueButton]}
+            style={[
+              styles.button, 
+              styles.continueButton,
+              isButtonDisabled && styles.buttonDisabled
+            ]}
             onPress={handleContinue}
+            disabled={isButtonDisabled}
           >
             <Text style={styles.buttonText}>{getButtonText()}</Text>
           </TouchableOpacity>
@@ -323,6 +355,9 @@ const styles = StyleSheet.create({
   },
   continueButton: {
     backgroundColor: colors.primary,
+  },
+  buttonDisabled: {
+    opacity: 0.5,
   },
   buttonText: {
     fontSize: 18,
